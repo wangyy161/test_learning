@@ -25,8 +25,16 @@ PURPLE       = (143,   0, 255)
 
 class Pygame_plot():
     def __init__(self):
+        self.init = True
+        self.score = 0
+        self.reward = 0
 
     def main(self):
+        pygame.display.set_caption("test_plane")
+        DISPLAYSURF.fill(BLACK)
+        pygame.display.update()
+        image = pygame.surfarray.array3d(pygame.display.get_surface())
+
 
 
 
