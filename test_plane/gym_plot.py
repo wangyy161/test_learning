@@ -1,9 +1,19 @@
+'''
+1、本实验使用的是固定的障碍物（柱体），障碍物有四个；
+2、不管舰载放进去的顺序；
+3、使用三角形代替飞机，控制飞机的位置以及角度（绘制的图形进行旋转）；
+4、放大或者缩小使用pygame的接口。
+'''
 from math import pi, sin, cos, asin, acos
 import pygame
 pygame.init()
+import random
 
 WINDOW_WIDTH = 1000
 WINDOW_HIGHT = 1000
+
+HALF_WIDTH = WINDOW_WIDTH / 2
+HALF_HIGHT = WINDOW_HIGHT / 2
 
 BASIC_FONT = pygame.font.Font('freesansbold.ttf', 8)
 DISPLAYSURF = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HIGHT))
@@ -35,6 +45,11 @@ class Pendulum:
         pygame.init()
         # pygame.display.set_caption('Pendulum')
         DISPLAYSURF.fill(BLACK)
+        x_1 = random.randint(10, 20)
+
+
+
+
         thetacos = acos(state[0])
         thetasin = asin(state[1])
 
