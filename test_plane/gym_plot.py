@@ -6,6 +6,9 @@
 '''
 from math import pi, sin, cos, asin, acos
 import pygame
+import cv2 as cv
+import numpy as np
+
 pygame.init()
 import random
 
@@ -28,11 +31,20 @@ YELLOW       = (162, 162,  46)
 NAVY         = ( 75,   0, 255)
 PURPLE       = (143,   0, 255)
 
-class Pendulum:
+class Plane_plot:
     def __init__(self):
         global FPS_CLOCK, DISPLAYSURF, BASIC_FONT
         FPS_CLOCK = pygame.time.Clock()
         pygame.display.set_caption('Plane_board')
+        # 该部分计算障碍物的坐标
+        self.obstacle = {}
+        self.obstacle_num = 1
+        self.obstacle_x = [int(WINDOW_WIDTH / 3), int(2 * WINDOW_WIDTH / 3)]
+        self.obstacle_y = [int(WINDOW_HIGHT / 3), int(2 * WINDOW_HIGHT / 3)]
+        for i in range(len(self.obstacle_x)):
+            for j in range(len(self.obstacle_y)):
+                self.obstacle[self.obstacle_num] = [self.obstacle_x[i], self.obstacle_y[j]]
+                self.obstacle_num += 1
 
         self.init = True
         self.score = 0
@@ -41,56 +53,81 @@ class Pendulum:
         self.TargetPosition_First = 0
         self.TargetPosition_Gauss_First = 0
 
-    def get_state_img(self, state):
+        self.obstacle_size = 20
+
+    # 此处的point表示的是三角形的中心点，size表示的是三角形的大小（0，1，2）表示三种类型，还有一个
+    # 是障碍物的位置，使用四个区域的中心点坐标进行控制
+    def init_plot(self):
+
         pygame.init()
         # pygame.display.set_caption('Pendulum')
         DISPLAYSURF.fill(BLACK)
-        x_1 = random.randint(10, 20)
-
-
-
-
-        thetacos = acos(state[0])
-        thetasin = asin(state[1])
-
-        # 由于asin的取值范围为：-pi/2 ~ pi/2，cos取值范围为：0 ~ pi
-        if thetasin >= 0:
-            theta = -thetacos
-        else:
-            theta = thetacos
-        # print('.....gym_plot.....', theta, '.....gym_plot.....')
-        theta = (theta / pi) * 180
-        # print('.....gym_plot.....', theta, '.....gym_plot.....')
-        Horizontal_start = [100, int(WINDOW_HIGHT / 2)]
-        Horizontal_end   = [380, int(WINDOW_HIGHT / 2)]
-        center = [int(WINDOW_WIDTH / 2), int(WINDOW_HIGHT / 2)]
-        radius = 140
-        Vertical_start = [int(WINDOW_WIDTH / 2), 50]
-
-        angle = theta - 90
-
-        # 通过半径、角度、圆点坐标求解直线上的点
-        x1 = center[0] + radius * cos(angle * pi / 180)
-        x2 = center[1] + radius * sin(angle * pi / 180)
-        Pendulum_Point = (x1, x2)
-        # 将扭矩作为输入信息，进行可视化，但是好像还是没有什么效果
-        radius = abs(int(state[2] * 10))
-        # 这段是防止禅城半径为0的信息，会报错，所以进行处理一下下
-        if radius <= 5:
-            radius = 5
-        Rect = ((int(WINDOW_WIDTH / 2) - radius, int(WINDOW_HIGHT / 2) - radius), (radius * 2, radius * 2))
-        # print('..........', Rect, '..........')
-        pygame.draw.line(DISPLAYSURF, WHITE, Horizontal_start, Horizontal_end, 8)
-        pygame.draw.line(DISPLAYSURF, ORANGE, Vertical_start, center, 10)
-        pygame.draw.line(DISPLAYSURF, GREEN, Pendulum_Point, center, 8)
-        if state[2] >= 0:
-            pygame.draw.ellipse(DISPLAYSURF, NAVY, Rect, 4)
-        else:
-            pygame.draw.ellipse(DISPLAYSURF, YELLOW, Rect, 4)
-        pygame.display.update()
+        # 障碍物绘制
+        for i in range(self.obstacle_num - 1):
+            x, y = self.obstacle[i+1][0], self.obstacle[i+1][1]
+            obstacle_rect = pygame.Rect(x + self.obstacle_size / 2, y + self.obstacle_size / 2, self.obstacle_size, self.obstacle_size)
+            pygame.draw.rect(DISPLAYSURF, WHITE, obstacle_rect)
+        pygame.display.flip()
+        # pygame.display.update()
         image_data = pygame.surfarray.array3d(pygame.display.get_surface())
-
+        # cv.imshow('hello', image_data)
         return image_data
+
+    def Rotate(self, point_x, point_y, point, angle):
+        rot_x = (point_x - point[0]) * cos(angle) + (point_y - point[1]) * sin(angle) + point[0]
+        rot_y = (point_y - point[1]) * cos(angle) - (point_x - point[0]) * sin(angle) + point[1]
+        return int(rot_x), int(rot_y)
+    def judge_overlapping(self, imge_data, rect):
+        pygame.init()
+        screencaption = pygame.display.set_caption('hello world')
+        screen = pygame.display.set_mode([1000,1000])
+        screen.fill(BLACK)
+        pygame.draw.polygon(DISPLAYSURF, WHITE, rect)
+        # pygame.display.update()
+        pygame.display.flip()
+        image_data_now = pygame.surfarray.array3d(pygame.display.get_surface())
+
+        gray_last = cv.cvtColor(imge_data, cv.COLOR_RGB2GRAY)  # 把输入图像灰度化
+        gray_now = cv.cvtColor(image_data_now, cv.COLOR_RGB2GRAY)  # 把输入图像灰度化
+
+        value = np.dot(gray_last, gray_now)
+        if value == 0:
+            overlapping = True
+        else:
+            overlapping = False
+        return overlapping
+    def get_state_img(self, point, angle, size, if_init):
+
+        if if_init:
+            image_data = self.init_plot()
+            terminal = False
+        else:
+            [x, y] = point
+            plane_size_1 = size * 4 + 20
+            plane_size_2 = (size * 4 + 20) / 2
+            # 开始投放飞机：主要参数为：飞机的位置点、飞机的朝向、飞机的型号
+            # 使用等腰三角形进行替代
+            x1, y1 = self.Rotate(x, y - plane_size_1, point, angle)
+            x2, y2 = self.Rotate(x - plane_size_2, y + plane_size_2, point, angle)
+            x3, y3 = self.Rotate(x + plane_size_2, y + plane_size_2, point, angle)
+            rect = ((x1, y1), (x2, y2), (x3, y3))
+            # 画出旋转之后的三角形
+            pygame.draw.polygon(DISPLAYSURF, WHITE, rect)
+
+            # pygame.display.update()
+            pygame.display.flip()
+            image_data = pygame.surfarray.array3d(pygame.display.get_surface())
+
+            # cv.imshow('input_image', image_data)
+            terminal = False
+
+            # overlapping = self.judge_overlapping(image_data, rect)
+            # if overlapping:
+            #     terminal = True
+            # else:
+            #     terminal = False
+
+        return image_data, terminal
 
 
 

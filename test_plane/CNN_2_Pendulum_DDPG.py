@@ -3,7 +3,7 @@ import random
 
 import cv2
 import gym
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 
@@ -13,10 +13,8 @@ import gym_plot
 env = gym.make('Pendulum-v0')
 game_name = 'Pendulum'
 algorithm = 'DDPG'
-pendulum_plot = gym_plot.Pendulum()
-Num_states = env.observation_space.shape[0]
-Num_action = env.action_space.shape[0]
-action_max = 2
+pendulum_plot = gym_plot.Plane_plot()
+Num_action = 3
 
 # Parameter setting
 Gamma = 0.99
@@ -50,7 +48,7 @@ first_fc_critic = [11 * 11 * 32, 400]
 second_fc_critic = [400 + Num_action, 300]
 third_fc_critic = [300, 1]
 
-img_size = 84
+img_size = 1000
 
 
 # print('..........', Num_states, Num_action, '..........')
@@ -143,7 +141,7 @@ def Actor(x, network_name):
 
     output_actor = tf.nn.tanh(tf.matmul(h_fc2_actor, w_fc3_actor) + b_fc3_actor)
     # 个人理解，actor网络输出乘以动作的最大值，可能跟引入的噪声有关系，在引入噪声的过程中
-    return action_max * output_actor
+    return output_actor
 
 
 def reshape_input(state):
@@ -187,7 +185,7 @@ def Critic(x, policy, network_name):
 
 # Information from the network
 # x = tf.placeholder(tf.float32, shape = [None, Num_states])
-x = tf.placeholder(tf.float32, shape=[None, 84, 84, 3])
+x = tf.placeholder(tf.float32, shape=[None, img_size, img_size, 3])
 
 Policy = Actor(x, 'Actor_main')
 Policy_target = Actor(x, 'Actor_target')
@@ -222,11 +220,12 @@ init = tf.global_variables_initializer()
 sess = tf.Session()
 sess.run(init)
 
+init_point = [5, 5]
 # Initialization
 noise = OU_noise(env.action_space)
 # 为了能够随机探索，给其加上一个噪声处理过程，可以随机产生动作。噪声的最大值为2，最小值为-2.
-state = env.reset()
-state_img = pendulum_plot.get_state_img(state)
+# 表示的是初始位置为init_point，角度为0，当前停的是0型号的飞机
+state_img, terminal = pendulum_plot.get_state_img(init_point, 0, 0, if_init=True)
 state_img = reshape_input(state_img)
 noise.reset()
 # Initial parameters
@@ -247,7 +246,7 @@ maxQ_list = []
 plot_x = []
 plot_y = []
 
-f, (ax1, ax2, ax3) = plt.subplots(3, sharex=True)
+# f, (ax1, ax2, ax3) = plt.subplots(3, sharex=True)
 
 while True:
     # Define progress
@@ -257,28 +256,32 @@ while True:
     elif step <= Num_start_training + Num_training:
         progress = 'Training'
     # env.render()
-    elif step < Num_start_training + Num_training + Num_testing:
+    else:
+        # step < Num_start_training + Num_training + Num_testing:
         progress = 'Testing'
         env.render()
-    else:
-        # Test is finished
-        print('Test is finished!!')
-        plt.savefig('./Plot/' + data_time + '_' + algorithm + '_' + game_name + '.png')
-        break
+    # else:
+    #     # Test is finished
+    #     print('Test is finished!!')
+    #     plt.savefig('./Plot/' + data_time + '_' + algorithm + '_' + game_name + '.png')
+    #     break
 
     # Choose action
     # state = state.reshape(-1, Num_states)
     # state_img = pendulum_plot.get_state_img(state)
-    action = sess.run(Policy, feed_dict={x: state_img})
+    # action = sess.run(Policy, feed_dict={x: state_img})
+    action = [[0.1]]
+    reward = 0.0
+    point = [random.uniform(0, 1000) for _ in range(2)]
+    angle = random.uniform(0, 2 * np.pi)
+    size = random.randint(0, 2)
 
     # Add noise
-    if progress != 'Testing':
-        action = noise.add_noise(action, step_train)
+    # if progress != 'Testing':
+    #     action = noise.add_noise(action, step_train)
+    state_next_img, terminal = pendulum_plot.get_state_img(point, angle, size, if_init=False)
 
-    state_next, reward, terminal, _ = env.step(action)
-    # state_next = state_next.reshape(-1, Num_states)# reshape（-1，n）表示的是行数未知，将其reshape为n列；将大小[3,1]变为[1,3]
-    state_next = state_next.reshape(Num_states)
-    state_next_img = pendulum_plot.get_state_img(state_next)
+    cv2.imshow('imgdata', state_next_img)
     state_next_img = reshape_input(state_next_img)
     # Experience replay 设置经验池
     if len(replay_memory) >= Num_replay_memory:
@@ -323,32 +326,32 @@ while True:
 
     # Update parameters at every iteration
     step += 1
-    score += reward[0]
+    score += reward
 
     state_img = state_next_img
 
     # Plotting
-    if len(plot_x) % Num_episode_plot == 0 and len(plot_x) != 0 and progress != 'Exploring':
-        ax1.plot(np.average(plot_x), np.average(plot_y), '*')
-        ax1.set_ylabel('Score')
-        ax1.set_title('Average Score ' + algorithm)
-
-        ax2.plot(np.average(plot_x), np.average(plot_loss), 'o')
-        ax2.set_ylabel('Loss')
-        ax2.set_title('Critic Loss ' + algorithm)
-
-        ax3.plot(np.average(plot_x), np.average(plot_Q), 'd')
-        ax3.set_xlabel('Episode')
-        ax3.set_ylabel('Q-value')
-        ax3.set_title('Q_value ' + algorithm)
-
-        plt.draw()
-        plt.pause(0.000001)
-
-        plot_x = []
-        plot_y = []
-        plot_loss = []
-        plot_Q = []
+    # if len(plot_x) % Num_episode_plot == 0 and len(plot_x) != 0 and progress != 'Exploring':
+    #     ax1.plot(np.average(plot_x), np.average(plot_y), '*')
+    #     ax1.set_ylabel('Score')
+    #     ax1.set_title('Average Score ' + algorithm)
+    #
+    #     ax2.plot(np.average(plot_x), np.average(plot_loss), 'o')
+    #     ax2.set_ylabel('Loss')
+    #     ax2.set_title('Critic Loss ' + algorithm)
+    #
+    #     ax3.plot(np.average(plot_x), np.average(plot_Q), 'd')
+    #     ax3.set_xlabel('Episode')
+    #     ax3.set_ylabel('Q-value')
+    #     ax3.set_title('Q_value ' + algorithm)
+    #
+    #     plt.draw()
+    #     plt.pause(0.000001)
+    #
+    #     plot_x = []
+    #     plot_y = []
+    #     plot_loss = []
+    #     plot_Q = []
 
     # Terminal
     if terminal:
