@@ -225,7 +225,7 @@ init_point = [5, 5]
 noise = OU_noise(env.action_space)
 # 为了能够随机探索，给其加上一个噪声处理过程，可以随机产生动作。噪声的最大值为2，最小值为-2.
 # 表示的是初始位置为init_point，角度为0，当前停的是0型号的飞机
-state_img, terminal = pendulum_plot.get_state_img(init_point, 0, 0, if_init=True)
+state_img, terminal, reward = pendulum_plot.get_state_img(init_point, 0, 0, if_init=True)
 state_img = reshape_input(state_img)
 noise.reset()
 # Initial parameters
@@ -271,7 +271,7 @@ while True:
     # state_img = pendulum_plot.get_state_img(state)
     # action = sess.run(Policy, feed_dict={x: state_img})
     action = [[0.1]]
-    reward = 0.0
+
     point = [random.uniform(0, 1000) for _ in range(2)]
     angle = random.uniform(0, 2 * np.pi)
     size = random.randint(0, 2)
@@ -279,9 +279,9 @@ while True:
     # Add noise
     # if progress != 'Testing':
     #     action = noise.add_noise(action, step_train)
-    state_next_img, terminal = pendulum_plot.get_state_img(point, angle, size, if_init=False)
+    state_next_img, terminal, reward = pendulum_plot.get_state_img(point, angle, size, if_init=False)
 
-    cv2.imshow('imgdata', state_next_img)
+    # cv2.imshow('imgdata', state_next_img)
     state_next_img = reshape_input(state_next_img)
     # Experience replay 设置经验池
     if len(replay_memory) >= Num_replay_memory:
@@ -357,14 +357,14 @@ while True:
     if terminal:
         print('step: ' + str(step) + ' / ' + 'episode: ' + str(
             episode) + ' / ' + 'state: ' + progress + ' / ' + 'score: ' + str(score))
+        break
+    # if progress != 'Observing':
+    #         # data for plotting
+    #         plot_x.append(episode)
+    #         plot_y.append(score)
 
-        if progress != 'Observing':
-            # data for plotting
-            plot_x.append(episode)
-            plot_y.append(score)
-
-        score = 0
-        episode += 1
-
-        state = env.reset()
-        noise.reset()
+    # score = 0
+    # episode += 1
+    #
+    # state = env.reset()
+    # noise.reset()
